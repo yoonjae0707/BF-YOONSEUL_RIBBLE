@@ -18,7 +18,7 @@ jobs:
         run: pip install requests
       - name: Install dependencies
         run: |
-          pip install requests pytz  # 여기에 pytz를 추가합니다.
+          pip install requests pytz 
       - name: Run YouTube Script
         env:
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
