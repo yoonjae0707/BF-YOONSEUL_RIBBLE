@@ -21,8 +21,11 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────
 SUPABASE_KEY    = os.environ.get("SUPABASE_KEY", "")
 SUPABASE_URL    = os.environ.get("SUPABASE_URL", "")
-SOOP_ID         = os.environ.get("SOOP_ID", "")
-SOOP_SECRET     = os.environ.get("SOOP_SECRET", "")  # ✅ 환경 변수로 통일
+# ── SOOP (API 사용 범위 문의 전 / 확인 후 주석 해제) ──
+# SOOP_ID     = os.environ.get("SOOP_ID", "")
+# SOOP_SECRET = os.environ.get("SOOP_SECRET", "")
+SOOP_ID     = ""  # 임시 비활성화
+SOOP_SECRET = ""  # 임시 비활성화
 
 if not SUPABASE_KEY or not SUPABASE_URL:
     raise EnvironmentError("SUPABASE_KEY 또는 SUPABASE_URL 환경 변수가 설정되지 않았습니다.")
@@ -91,39 +94,45 @@ def insert_live_log(
 
 
 # ─────────────────────────────────────────
-# SOOP
+# SOOP (API 사용 범위 문의 후 활성화 예정)
 # ─────────────────────────────────────────
-def get_soop_token(session: requests.Session) -> str | None:
-    """SOOP OAuth 토큰을 발급받습니다."""
-    if not SOOP_ID or not SOOP_SECRET:
-        logger.warning("SOOP_ID 또는 SOOP_SECRET이 설정되지 않아 SOOP 토큰 발급을 건너뜁니다.")
-        return None
+# ⚠️ TODO: SOOP API 문의 완료 후 아래 주석 해제
+#   - 인증 흐름: /auth/code → /auth/token (2단계)
+#   - grant_type, endpoint URL 문서 확인 후 수정 필요
 
-    url = "https://openapi.sooplive.co.kr/oauth/token"
-    data = {
-        "grant_type": "client_credentials",
-        "client_id": SOOP_ID,
-        "client_secret": SOOP_SECRET
-    }
-    res = session.post(url, data=data)
-    res.raise_for_status()
-    token = res.json().get("access_token")
-    if not token:
-        logger.error("SOOP 토큰 발급 실패: access_token이 없습니다.")
-    return token
+# def get_soop_token(session: requests.Session) -> str | None:
+#     """SOOP OAuth 토큰을 발급받습니다."""
+#     if not SOOP_ID or not SOOP_SECRET:
+#         logger.warning("SOOP_ID 또는 SOOP_SECRET이 설정되지 않아 SOOP 토큰 발급을 건너뜁니다.")
+#         return None
+#
+#     # TODO: 정확한 엔드포인트 및 인증 흐름 확인 필요
+#     url = "https://openapi.sooplive.co.kr/auth/token"
+#     data = {
+#         "grant_type": "authorization_code",
+#         "client_id": SOOP_ID,
+#         "client_secret": SOOP_SECRET,
+#         "code": "<1단계에서 발급받은 code>"
+#     }
+#     res = session.post(url, data=data)
+#     res.raise_for_status()
+#     token = res.json().get("access_token")
+#     if not token:
+#         logger.error("SOOP 토큰 발급 실패: access_token이 없습니다.")
+#     return token
 
 
-def check_soop_live(session: requests.Session, live_id: str, token: str) -> tuple[bool, int]:
-    """SOOP 라이브 상태를 확인합니다."""
-    url = f"https://openapi.sooplive.co.kr/broad/free/v1/channel/{live_id}"
-    headers = {"Authorization": f"Bearer {token}"}
-    res = session.get(url, headers=headers)
-    res.raise_for_status()
-
-    broad = res.json().get("broad", {})
-    is_live = broad.get("is_broad") is True
-    viewers = broad.get("total_view_cnt", 0) if is_live else 0
-    return is_live, viewers
+# def check_soop_live(session: requests.Session, live_id: str, token: str) -> tuple[bool, int]:
+#     """SOOP 라이브 상태를 확인합니다."""
+#     url = f"https://openapi.sooplive.co.kr/broad/free/v1/channel/{live_id}"
+#     headers = {"Authorization": f"Bearer {token}"}
+#     res = session.get(url, headers=headers)
+#     res.raise_for_status()
+#
+#     broad = res.json().get("broad", {})
+#     is_live = broad.get("is_broad") is True
+#     viewers = broad.get("total_view_cnt", 0) if is_live else 0
+#     return is_live, viewers
 
 
 # ─────────────────────────────────────────
@@ -148,14 +157,15 @@ def check_live_status(
     session: requests.Session,
     platform: str,
     live_id: str,
-    soop_token: str | None
+    soop_token: str | None  # ⚠️ SOOP 활성화 전까지 항상 None
 ) -> tuple[bool, int]:
     """플랫폼에 따라 라이브 상태를 확인합니다."""
     if platform == "치지직" and live_id:
         return check_chzzk_live(session, live_id)
 
-    elif platform == "SOOP" and live_id and soop_token:
-        return check_soop_live(session, live_id, soop_token)
+    # ⚠️ SOOP: API 문의 완료 후 주석 해제
+    # elif platform == "SOOP" and live_id and soop_token:
+    #     return check_soop_live(session, live_id, soop_token)
 
     # 지원하지 않는 플랫폼이거나 ID 없음
     return False, 0
@@ -172,7 +182,9 @@ def run_live_update() -> None:
         artists = fetch_artists(session)
         logger.info(f"총 {len(artists)}명의 아티스트 조회 완료")
 
-        soop_token = get_soop_token(session) if SOOP_ID else None
+        # ⚠️ SOOP: API 문의 완료 후 주석 해제
+        # soop_token = get_soop_token(session) if SOOP_ID else None
+        soop_token = None  # 임시 비활성화
 
         for artist in artists:
             name     = artist.get("name", "")
